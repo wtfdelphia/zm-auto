@@ -10,6 +10,8 @@ config.json
 
 # Output
 accounts.json
+sub2api_export.json
+user_info.json
 
 # OS
 .DS_Store

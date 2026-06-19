@@ -10,7 +10,10 @@
         "enable": true,
         "api_base": "https://your-cf-mail-worker.example.com",
         "admin_password": "your-admin-password",
-        "domain": ["example.com", "mail.example.com"]
+        "domain": [
+          "example.com",
+          "mail.example.com"
+        ]
       },
       {
         "type": "gptmail",
@@ -22,7 +25,9 @@
         "type": "tempmail_lol",
         "enable": false,
         "api_key": "",
-        "domain": ["*.tempmail.lol"]
+        "domain": [
+          "*.tempmail.lol"
+        ]
       },
       {
         "type": "duckmail",
@@ -35,14 +40,18 @@
         "enable": false,
         "api_base": "https://your-moemail.example.com",
         "api_key": "your-moemail-api-key",
-        "domain": ["example.com"],
+        "domain": [
+          "example.com"
+        ],
         "expiry_time": 0
       },
       {
         "type": "inbucket",
         "enable": false,
         "api_base": "https://your-inbucket.example.com",
-        "domain": ["example.com"],
+        "domain": [
+          "example.com"
+        ],
         "random_subdomain": true
       },
       {
@@ -50,19 +59,61 @@
         "enable": false,
         "api_base": "https://maliapi.215.im/v1",
         "api_key": "your-yyds-api-key",
-        "domain": ["example.com"],
+        "domain": [
+          "example.com"
+        ],
         "subdomain": "",
         "wildcard": false
       }
-    ]
+    ],
+    "prefix": ""
   },
   "proxy": "",
   "total": 1,
   "threads": 1,
   "headless": false,
   "captcha": {
-    "provider": "",
-    "api_key": ""
+    "provider": "2captcha",
+    "api_key": "",
+    "browser": {
+      "headless": true,
+      "stealth": true,
+      "user_data_dir": "",
+      "cdp_url": "http://127.0.0.1:9222"
+    }
   },
-  "api_key_name": "auto"
+  "api_key_name": "auto",
+  "_comment_captcha": "验证码方案: 修改 captcha.provider 即可切换\n  \"2captcha\" = 打码平台（需 api_key，纯 HTTP，~$0.005/账号）\n  \"browser\"  = 本地 Playwright 浏览器（免费，自动完成）\n  \"cdp\"      = Chrome DevTools 人工介入（免费，最稳，需先启动 Chrome）\nCDP 方案启动 Chrome 命令:\n  open -a \"Google Chrome\" --args --remote-debugging-port=9222 --proxy-server=\"http://127.0.0.1:7890\" --user-data-dir=/tmp/chrome-cdp",
+  "sub2api": {
+    "enabled": false,
+    "base_url": "",
+    "email": "",
+    "password": "",
+    "group_name": "auto",
+    "concurrency": 3,
+    "models": [
+      "z-ai/glm-5.2-free",
+      "moonshotai/kimi-k2.7-code-free"
+    ],
+    "upstream_base_url": "",
+    "export": {
+      "base_url": "",
+      "notes_path": "/v1/chat/completions",
+      "openai_responses_supported": true,
+      "openai_responses_mode": "force_chat_completions",
+      "model_aliases": {
+        "gpt-5.5": "z-ai/glm-5.2-free",
+        "gpt-5": "z-ai/glm-5.2-free",
+        "gpt-4": "z-ai/glm-5.2-free",
+        "claude-opus-4-7": "moonshotai/kimi-k2.7-code-free",
+        "claude-sonnet-4": "moonshotai/kimi-k2.7-code-free"
+      }
+    }
+  },
+  "logout_after": true,
+  "on_waitlist": "abort",
+  "waitlist_logout": true,
+  "site_url": "https://example.com",
+  "invite_code": "",
+  "auto_create_api_key": false
 }

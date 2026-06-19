@@ -5,11 +5,22 @@ Users are solely responsible for complying with all applicable ToS and laws.
 
 from __future__ import annotations
 
+import json
 import requests
 import urllib3
+from pathlib import Path
 from typing import Any
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+def _load_site_url() -> str:
+    try:
+        with open(Path(__file__).resolve().parent / "config.json", encoding="utf-8") as f:
+            cfg = json.load(f)
+        return str(cfg.get("site_url", "https://zenmux.ai")).rstrip("/")
+    except Exception:
+        return "https://zenmux.ai"
 
 
 class Sub2APIImporter:
@@ -22,7 +33,7 @@ class Sub2APIImporter:
         self.group_name = str(cfg.get("group_name", "auto"))
         self.concurrency = int(cfg.get("concurrency", 3))
         self.models = list(cfg.get("models", []))
-        self.upstream_base_url = str(cfg.get("upstream_base_url", ""))
+        self.upstream_base_url = str(cfg.get("upstream_base_url") or f"{_load_site_url()}/api/anthropic")
         self._token: str = ""
         self._group_id: int = 0
         self._session = requests.Session()

@@ -154,6 +154,9 @@ _FORBIDDEN_CODES = {"177010"}
 
 
 def _extract_code(message: dict[str, Any]) -> str | None:
+    print(f"  [DEBUG] _extract_code: subject={message.get("subject","")[:80]!r}", flush=True)
+    print(f"  [DEBUG] _extract_code: text_content={message.get("text_content","")[:200]!r}", flush=True)
+    print(f"  [DEBUG] _extract_code: html_content={message.get("html_content","")[:200]!r}", flush=True)
     content = (
         f"{message.get('subject', '')}\n{message.get('text_content', '')}\n{message.get('html_content', '')}".strip()
     )
@@ -197,9 +200,13 @@ class BaseMailProvider:
         self.provider_ref = provider_ref
 
     def wait_for(self, mailbox: dict[str, Any], on_message: Callable[[dict[str, Any]], ResultT | None]) -> ResultT | None:
+        poll_count = 0
         deadline = time.monotonic() + self.conf["wait_timeout"]
         while time.monotonic() < deadline:
             message = self.fetch_latest_message(mailbox)
+            poll_count += 1
+            if poll_count % 5 == 1:
+                print(f"  [DEBUG] wait_for: 第 {poll_count} 次轮询...", flush=True)
             if message:
                 result = on_message(message)
                 if result is not None:
@@ -236,12 +243,14 @@ class BaseMailProvider:
 class CloudflareTempMailProvider(BaseMailProvider):
     name = "cloudflare_temp_email"
 
-    def __init__(self, entry: dict, conf: dict):
+    def __init__(self, entry: dict, conf: dict, proxy: str = ""):
         super().__init__(conf, str(entry.get("provider_ref") or ""))
         self.api_base = str(entry["api_base"]).rstrip("/")
         self.admin_password = str(entry["admin_password"]).strip()
         self.domain = entry.get("domain") or []
         self.session = curl_requests.Session(impersonate="chrome")
+        if proxy:
+            self.session.proxies = {"http": proxy, "https": proxy}
 
     def _request(self, method, path, headers=None, params=None, payload=None, expected=(200,)):
         resp = self.session.request(
@@ -281,39 +290,60 @@ class CloudflareTempMailProvider(BaseMailProvider):
             "token": token,
         }
 
-    def fetch_latest_message(self, mailbox: dict[str, Any]) -> dict[str, Any] | None:
+    def _fetch_messages(self, mailbox: dict[str, Any], parsed: bool = False) -> list[dict]:
+        """Fetch messages from API. If parsed=True, use /api/parsed_mails (decoded subject/text/html)."""
+        path = "/api/parsed_mails" if parsed else "/api/mails"
         data = self._request(
             "GET",
-            "/api/mails",
+            path,
             headers={"Authorization": f"Bearer {mailbox['token']}"},
             params={"limit": 10, "offset": 0},
         )
         raw = list(data.get("results") or []) if isinstance(data, dict) else data if isinstance(data, list) else []
-        messages = [
-            item
-            for item in raw
-            if isinstance(item, dict) and _message_matches_email(item, str(mailbox.get("address") or ""))
-        ]
-        if not messages:
-            return None
-        item = messages[0]
-        text_content, html_content = _extract_content(item)
-        sender = item.get("from") or item.get("sender") or ""
-        if isinstance(sender, dict):
-            sender = sender.get("address") or sender.get("email") or sender.get("name") or ""
-        return {
-            "provider": self.name,
-            "mailbox": mailbox["address"],
-            "message_id": str(item.get("id") or item.get("_id") or ""),
-            "subject": str(item.get("subject") or ""),
-            "sender": str(sender),
-            "text_content": text_content,
-            "html_content": html_content,
-            "received_at": _parse_received_at(
-                item.get("createdAt") or item.get("created_at") or item.get("receivedAt") or item.get("date") or item.get("timestamp")
-            ),
-            "raw": item,
-        }
+        return [item for item in raw if isinstance(item, dict)]
+
+    def fetch_latest_message(self, mailbox: dict[str, Any]) -> dict[str, Any] | None:
+        # Try parsed endpoint first (cleaner: decoded subject, text, html)
+        for parsed in (True, False):
+            raw = self._fetch_messages(mailbox, parsed=parsed)
+            if raw:
+                print(f"  [DEBUG] fetch_latest_message(parsed={parsed}): {len(raw)} 条, keys={list(raw[0].keys())}", flush=True)
+            messages = [
+                item for item in raw
+                if _message_matches_email(item, str(mailbox.get("address") or ""))
+            ]
+            if not messages:
+                continue
+            item = messages[0]
+            if parsed:
+                # parsed endpoint already has decoded subject/text/html
+                text_content = str(item.get("text") or "")
+                html_content = str(item.get("html") or "")
+                subject = str(item.get("subject") or "")
+                sender = str(item.get("sender") or item.get("source") or "")
+            else:
+                text_content, html_content = _extract_content(item)
+                subject = str(item.get("subject") or "")
+                sender = item.get("from") or item.get("source") or item.get("sender") or ""
+            if isinstance(sender, dict):
+                sender = sender.get("address") or sender.get("email") or sender.get("name") or ""
+            print(f"  [DEBUG] subject={subject[:80]!r}", flush=True)
+            print(f"  [DEBUG] text={text_content[:200]!r}", flush=True)
+            print(f"  [DEBUG] html={html_content[:200]!r}", flush=True)
+            return {
+                "provider": self.name,
+                "mailbox": mailbox["address"],
+                "message_id": str(item.get("id") or item.get("_id") or ""),
+                "subject": subject,
+                "sender": str(sender),
+                "text_content": text_content,
+                "html_content": html_content,
+                "received_at": _parse_received_at(
+                    item.get("createdAt") or item.get("created_at") or item.get("receivedAt") or item.get("date") or item.get("timestamp")
+                ),
+                "raw": item,
+            }
+        return None
 
     def close(self) -> None:
         self.session.close()
@@ -325,11 +355,13 @@ class CloudflareTempMailProvider(BaseMailProvider):
 class TempMailLolProvider(BaseMailProvider):
     name = "tempmail_lol"
 
-    def __init__(self, entry: dict, conf: dict):
+    def __init__(self, entry: dict, conf: dict, proxy: str = ""):
         super().__init__(conf, str(entry.get("provider_ref") or ""))
         self.api_key = str(entry.get("api_key") or "").strip()
         self.domain = [str(item).strip() for item in (entry.get("domain") or []) if str(item).strip()]
         self.session = requests.Session()
+        if proxy:
+            self.session.proxies = {"http": proxy, "https": proxy}
         self.session.trust_env = False
         self.session.headers.update(
             {"User-Agent": conf["user_agent"], "Accept": "application/json", "Content-Type": "application/json"}
@@ -406,6 +438,8 @@ class TempMailLolProvider(BaseMailProvider):
             ),
         )
         text_content, html_content = _extract_content(item)
+        print(f"  [DEBUG] _extract_content: text={text_content[:200]!r}", flush=True)
+        print(f"  [DEBUG] _extract_content: html={html_content[:200]!r}", flush=True)
         return {
             "provider": self.name,
             "mailbox": mailbox["address"],
@@ -434,11 +468,13 @@ class TempMailLolProvider(BaseMailProvider):
 class DuckMailProvider(BaseMailProvider):
     name = "duckmail"
 
-    def __init__(self, entry: dict, conf: dict):
+    def __init__(self, entry: dict, conf: dict, proxy: str = ""):
         super().__init__(conf, str(entry.get("provider_ref") or ""))
         self.api_key = str(entry["api_key"]).strip()
         self.default_domain = str(entry.get("default_domain") or "duckmail.sbs").strip() or "duckmail.sbs"
         self.session = requests.Session()
+        if proxy:
+            self.session.proxies = {"http": proxy, "https": proxy}
         self.session.trust_env = False
         self.session.headers.update(
             {"User-Agent": conf["user_agent"], "Accept": "application/json", "Content-Type": "application/json"}
@@ -521,11 +557,13 @@ class DuckMailProvider(BaseMailProvider):
 class GptMailProvider(BaseMailProvider):
     name = "gptmail"
 
-    def __init__(self, entry: dict, conf: dict):
+    def __init__(self, entry: dict, conf: dict, proxy: str = ""):
         super().__init__(conf, str(entry.get("provider_ref") or ""))
         self.api_key = str(entry["api_key"]).strip()
         self.default_domain = str(entry.get("default_domain") or "").strip()
         self.session = requests.Session()
+        if proxy:
+            self.session.proxies = {"http": proxy, "https": proxy}
         self.session.trust_env = False
         self.session.headers.update(
             {
@@ -592,7 +630,7 @@ class GptMailProvider(BaseMailProvider):
 class MoEmailProvider(BaseMailProvider):
     name = "moemail"
 
-    def __init__(self, entry: dict, conf: dict):
+    def __init__(self, entry: dict, conf: dict, proxy: str = ""):
         super().__init__(conf, str(entry.get("provider_ref") or ""))
         self.api_base = str(entry["api_base"]).rstrip("/")
         self.api_key = str(entry["api_key"]).strip()
@@ -603,6 +641,8 @@ class MoEmailProvider(BaseMailProvider):
             self.domain = [str(raw_domains).strip()] if str(raw_domains).strip() else []
         self.expiry_time = int(entry.get("expiry_time") or 0)
         self.session = curl_requests.Session(impersonate="chrome")
+        if proxy:
+            self.session.proxies = {"http": proxy, "https": proxy}
 
     def _request(self, method, path, params=None, payload=None, expected=(200,)):
         resp = self.session.request(
@@ -710,7 +750,7 @@ class MoEmailProvider(BaseMailProvider):
 class InbucketMailProvider(BaseMailProvider):
     name = "inbucket"
 
-    def __init__(self, entry: dict, conf: dict):
+    def __init__(self, entry: dict, conf: dict, proxy: str = ""):
         super().__init__(conf, str(entry.get("provider_ref") or ""))
         self.api_base = str(entry["api_base"]).rstrip("/")
         raw_domains = entry.get("domain") or []
@@ -720,6 +760,8 @@ class InbucketMailProvider(BaseMailProvider):
             self.domain = [str(raw_domains).strip()] if str(raw_domains).strip() else []
         self.random_subdomain = bool(entry.get("random_subdomain", True))
         self.session = requests.Session()
+        if proxy:
+            self.session.proxies = {"http": proxy, "https": proxy}
         self.session.trust_env = False
         self.session.headers.update(
             {
@@ -822,7 +864,7 @@ class InbucketMailProvider(BaseMailProvider):
 class YydsMailProvider(BaseMailProvider):
     name = "yyds_mail"
 
-    def __init__(self, entry: dict, conf: dict):
+    def __init__(self, entry: dict, conf: dict, proxy: str = ""):
         super().__init__(conf, str(entry.get("provider_ref") or ""))
         self.api_base = str(entry.get("api_base") or "https://maliapi.215.im/v1").rstrip("/")
         self.api_key = str(entry["api_key"]).strip()
@@ -830,6 +872,8 @@ class YydsMailProvider(BaseMailProvider):
         self.subdomain = str(entry.get("subdomain") or "").strip()
         self.wildcard = bool(entry.get("wildcard"))
         self.session = requests.Session()
+        if proxy:
+            self.session.proxies = {"http": proxy, "https": proxy}
         self.session.trust_env = False
         self.session.headers.update(
             {"User-Agent": conf["user_agent"], "Accept": "application/json", "Content-Type": "application/json"}
@@ -907,7 +951,7 @@ class YydsMailProvider(BaseMailProvider):
         if message_id:
             item = self._request("GET", f"/messages/{message_id}", token=str(mailbox.get("token") or ""), params={"address": mailbox["address"]})
         text_content, html_content = _extract_content(item)
-        sender = item.get("from") or item.get("sender") or ""
+        sender = item.get("from") or item.get("source") or item.get("sender") or ""
         if isinstance(sender, dict):
             sender = sender.get("address") or sender.get("email") or sender.get("name") or ""
         return {
@@ -968,7 +1012,7 @@ def _next_entry(mail_config: dict) -> dict:
         return value
 
 
-def _create_provider(mail_config: dict, provider: str = "", provider_ref: str = "") -> BaseMailProvider:
+def _create_provider(mail_config: dict, provider: str = "", provider_ref: str = "", proxy: str = "") -> BaseMailProvider:
     entry = next(
         (dict(item) for item in _entries(mail_config) if provider_ref and item["provider_ref"] == provider_ref),
         None,
@@ -985,22 +1029,23 @@ def _create_provider(mail_config: dict, provider: str = "", provider_ref: str = 
     cls = _PROVIDER_CLASSES.get(entry["type"])
     if not cls:
         raise RuntimeError(f"不支持的 mail.provider: {entry['type']}")
-    return cls(entry, conf)
+    return cls(entry, conf, proxy)
 
 
-def create_mailbox(mail_config: dict, username: str | None = None) -> dict:
-    provider = _create_provider(mail_config)
+def create_mailbox(mail_config: dict, username: str | None = None, proxy: str = "") -> dict:
+    provider = _create_provider(mail_config, proxy=proxy)
     try:
         return provider.create_mailbox(username)
     finally:
         provider.close()
 
 
-def wait_for_code(mail_config: dict, mailbox: dict) -> str | None:
+def wait_for_code(mail_config: dict, mailbox: dict, proxy: str = "") -> str | None:
     provider = _create_provider(
         mail_config,
-        str(mailbox.get("provider") or ""),
-        str(mailbox.get("provider_ref") or ""),
+        provider=str(mailbox.get("provider") or ""),
+        provider_ref=str(mailbox.get("provider_ref") or ""),
+        proxy=proxy,
     )
     try:
         return provider.wait_for_code(mailbox)
