@@ -154,9 +154,9 @@ _FORBIDDEN_CODES = {"177010"}
 
 
 def _extract_code(message: dict[str, Any]) -> str | None:
-    print(f"  [DEBUG] _extract_code: subject={message.get("subject","")[:80]!r}", flush=True)
-    print(f"  [DEBUG] _extract_code: text_content={message.get("text_content","")[:200]!r}", flush=True)
-    print(f"  [DEBUG] _extract_code: html_content={message.get("html_content","")[:200]!r}", flush=True)
+    print(f"  [DEBUG] _extract_code: subject={message.get('subject','')[:80]!r}", flush=True)
+    print(f"  [DEBUG] _extract_code: text_content={message.get('text_content','')[:200]!r}", flush=True)
+    print(f"  [DEBUG] _extract_code: html_content={message.get('html_content','')[:200]!r}", flush=True)
     content = (
         f"{message.get('subject', '')}\n{message.get('text_content', '')}\n{message.get('html_content', '')}".strip()
     )

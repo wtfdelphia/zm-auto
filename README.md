@@ -262,3 +262,52 @@ curl https://your-target-site/api/v1/chat/completions \
 5. **Free Plan**: 5 Flows / 5h
 6. **浏览器方案**: 首次运行会自动启动 Chromium（headless），性能取决于机器配置。确保已执行 `python -m playwright install chromium`
 7. **CDP 方案**: 需要先手动启动 Chrome（见配置说明），验证码由人工完成，脚本自动检测并继续。最稳定，不会被反爬检测拦截
+
+## AI 客户端入口
+
+本项目为多个 AI 客户端提供项目级规则，通用规则见 `AGENTS.md`，各客户端专用规则仅补充上下文与操作细节。
+
+| 客户端 | 规则文件 |
+| --- | --- |
+| 通用 / Codex / OpenCode | `AGENTS.md` |
+| Claude Code | `.claude/CLAUDE.md` |
+| Cursor | `.cursor/rules/rules.mdc` |
+| Gemini | `GEMINI.md` |
+| GitHub Copilot | `.github/copilot-instructions.md` |
+
+## SpecCoding / OpenSpec 工作流
+
+本项目使用 OpenSpec/SpecCoding 管理需求、跨模块改动和 AI 协作开发过程。
+
+- 项目级长期事实：`spec/`
+- 单次变更过程：`openspec/changes/<change-name>/`
+- AI agent 通用规则：`AGENTS.md`
+
+推荐开发闭环：
+
+```text
+/opsx:new 或 /opsx:continue
+  -> openspec-superpowers-bridge（输出 Bridge Plan）
+  -> 小步实现并更新 tasks.md
+  -> spec-compliance-check
+  -> openspec-verify-change 或 /opsx:verify
+  -> README/AGENTS/spec 同步判断
+  -> verification-before-completion
+  -> /opsx:archive
+```
+
+常用命令：
+
+```bash
+# 语法检查
+python -m py_compile *.py
+# 单元测试
+python -m pytest tests/ -v
+# CLI 帮助
+python register.py --help
+python read_user_info.py --help
+# OpenSpec 校验
+openspec validate --all
+```
+
+验证以语法检查、CLI 帮助、单元测试（`python -m pytest tests/ -v`）和真实 smoke 运行为主。

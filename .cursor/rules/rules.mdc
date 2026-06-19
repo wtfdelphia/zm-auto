@@ -1,0 +1,24 @@
+---
+description: zm-auto project rules for Cursor
+---
+
+# Cursor 规则 — zm-auto
+
+## 通用规则
+
+- 变更前先读 `AGENTS.md` 和 `spec/design.md`。
+- 只改当前任务相关文件，不顺手重构。
+- 所有新需求、跨模块改动、高风险修复必须先建 `openspec/changes/<change-name>/`。
+
+## 编码规范
+
+- Python 3.x，不使用 Python 2 语法。
+- 字符串引号与现有文件保持一致。
+- 不要在 f-string 中嵌套与外层相同的引号。
+- 密钥、密码、Cookie 只放 `config.json`，不写入代码。
+
+## 验证
+
+- 改完跑 `python3 -m py_compile <file>`。
+- 改 CLI 参数后跑 `python3 <script> --help`。
+- 不改运行时配置和输出文件的默认路径，除非同步 `config.example.json` 和文档。

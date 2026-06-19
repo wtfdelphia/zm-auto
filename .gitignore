@@ -1,4 +1,6 @@
 # Python
+.pytest_cache/
+
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -6,16 +8,30 @@ __pycache__/
 venv/
 
 # Config (contains secrets)
-config.json
 
+config.json
+test.sh
 # Output
+
 accounts.json
 sub2api_export.json
 user_info.json
+docs/auto.js
 
 # OS
-.DS_Store
 
+.DS_Store
 # IDE
+
 .vscode/
 .idea/
+# AI / tooling
+
+.codegraph/
+.worktrees/
+.claude/settings.local.json
+*.log
+target/
+build/
+dist/
+node_modules/
