@@ -1,0 +1,10 @@
+Usage: python -m zm_auto register [OPTIONS]
+
+  自动注册账号并获取 API Key。
+
+Options:
+  -n, --total INTEGER    注册数量
+  -t, --threads INTEGER  并发数
+  --proxy TEXT           代理地址  [default: ""]
+  --yes                  跳过敏感操作确认
+  --help                 Show this message and exit.

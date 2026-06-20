@@ -2,10 +2,8 @@
 
 ## Purpose
 
-抽象临时邮箱 provider 接口，支持 7 种 provider，统一接收验证码的接口，隐藏不同 API 差异，被 register.py 调用以轮询邮箱验证码。
-
+抽象临时邮箱 provider 接口，支持 7 种 provider，统一接收验证码的接口，隐藏不同 API 差异，被 `zm_auto/services/registrar.py` 调用以轮询邮箱验证码。
 ## Requirements
-
 ### Requirement: Cloudflare 自建临时邮箱
 
 系统 SHALL 通过 Cloudflare Workers 自建临时邮箱服务接收验证码。
@@ -56,6 +54,31 @@
 - **THEN** 系统按 wait_interval 间隔重试
 - **AND** 超时后退出并报告失败
 
+### Requirement: Provider 配置校验钩子
+
+`BaseMailProvider` SHALL 提供 `validate_config` 类方法。
+
+#### Scenario: 子类可覆盖校验
+
+- 子类可覆盖 `validate_config` 实现自定义校验。
+
+### Requirement: 必填字段校验
+
+默认实现 SHALL 校验 `required_fields` 中的字段在 config 字典中存在且非空。
+
+#### Scenario: 缺失必填字段报错
+
+- `BaseMailProvider` 子类设置 `required_fields = ["api_key"]` 后，`validate_config({})` 抛出 `ValueError`。
+- `validate_config({"api_key": "x"})` 通过。
+
+### Requirement: 工厂函数调用校验
+
+`create_mailbox` SHALL 在实例化前调用校验，缺失时 SHALL 抛出异常。
+
+#### Scenario: 校验失败阻止实例化
+
+- 工厂函数在 `provider_class.validate_config(entry)` 失败时抛出异常，不再继续实例化。
+
 ## Non-Goals
 
 - 不维护长期邮箱服务。
@@ -63,8 +86,9 @@
 
 ## Verification
 
-- `python -m py_compile mail_provider.py`
-- 单个注册 `python register.py -n 1` 通过邮箱验证码阶段
+- `python -m compileall zm_auto/providers`
+- `python -m py_compile zm_auto/providers/*.py`
+- 单个注册 `python -m zm_auto register -n 1` 通过邮箱验证码阶段
 
 ## Residual Risk
 

@@ -19,11 +19,15 @@
 ## 架构
 
 ```
-mail_provider.py     ← 7 个临时邮箱 provider（复刻自 chatgpt2api）
-captcha_solver.py    ← 验证码求解器（2captcha / anticaptcha / Playwright / CDP）
-register.py          ← 注册主流程 + CLI（纯 HTTP, curl_cffi）
-config.json          ← 运行时配置
-accounts.json        ← 注册结果输出
+zm_auto/
+  providers/        ← 7 个临时邮箱 provider
+  captcha/          ← 验证码求解器（2captcha / anticaptcha / Playwright / CDP）
+  cdp/              ← CDP 共享工具
+  services/         ← register / user-info / account-status 业务逻辑
+  cli/              ← click 统一 CLI
+  importers/        ← sub2api 兼容导出
+config.json         ← 运行时配置
+accounts.json       ← 注册结果输出
 ```
 
 ## 验证码方案
@@ -155,7 +159,7 @@ open -a "Google Chrome" --args \
 
 ### 自动创建 API Key
 
-`read_user_info.py` 在无 API Key 时可根据配置自动创建：
+`user-info` 子命令在无 API Key 时可根据配置自动创建：
 
 ```json
 {
@@ -170,13 +174,16 @@ open -a "Google Chrome" --args \
 
 ```bash
 # 单个注册
-python register.py -n 1
+python -m zm_auto register -n 1
 
 # 5 个账号，2 并发
-python register.py -n 5 -t 2
+python -m zm_auto register -n 5 -t 2
 
 # 走代理（浏览器方案也会自动透传代理）
-python register.py -n 3 --proxy http://127.0.0.1:7897
+python -m zm_auto register -n 3 --proxy http://127.0.0.1:7897
+
+# 兼容入口（仍可用）
+python register.py -n 1
 ```
 
 ## 输出
@@ -195,23 +202,26 @@ python register.py -n 3 --proxy http://127.0.0.1:7897
 ]
 ```
 
-## 读取已登录账号（read_user_info.py）
+## 读取已登录账号（user-info）
 
-如果你已经通过浏览器登录了目标站点，可以用 `read_user_info.py` 直接读取当前用户信息、已有 API Key，并在没有 API Key 时自动创建一个。
+如果你已经通过浏览器登录了目标站点，可以用 `user-info` 子命令直接读取当前用户信息、已有 API Key，并在没有 API Key 时自动创建一个。
 
 ```bash
 # 读取用户信息和 API Keys（若未配置 API Key 会自动创建）
-python read_user_info.py
+python -m zm_auto user-info
 
 # 导出为 sub2api 兼容格式
-python read_user_info.py --export-sub2api
+python -m zm_auto user-info --export-sub2api
 
 # 强制创建 API Key（即使已有也新建）
-python read_user_info.py --create-key
+python -m zm_auto user-info --create-key
 
 # 手动控制是否自动创建
-python read_user_info.py --auto-create-key      # 无 key 时自动创建
-python read_user_info.py --no-auto-create-key   # 不自动创建
+python -m zm_auto user-info --auto-create-key      # 无 key 时自动创建
+python -m zm_auto user-info --no-auto-create-key   # 不自动创建
+
+# 兼容入口（仍可用）
+python read_user_info.py
 ```
 
 ### 自动创建逻辑
@@ -232,6 +242,22 @@ python read_user_info.py --no-auto-create-key   # 不自动创建
 - `"api_key_name": "auto"`：随机生成 6 位名称
 - `"api_key_name": "mykey"`：固定使用 `mykey` 作为名称
 
+## 账号状态诊断（account-status）
+
+诊断当前已登录账号的状态：是否登录、是否需要 reCAPTCHA 验证、是否在白名单等。
+
+```bash
+# 使用默认 CDP URL（来自 config.json）
+python -m zm_auto account-status
+
+# 临时指定 CDP URL
+python -m zm_auto account-status --cdp-url http://host:9222
+
+# 兼容入口（仍可用）
+python check_account_status.py
+python check_account_status.py --cdp-url http://host:9222
+```
+
 ## API Key 用法
 
 ```bash
@@ -242,6 +268,117 @@ curl https://your-target-site/api/v1/chat/completions \
 ```
 
 > ⚠️ endpoint 是 `<site_url>/api/v1/chat/completions`，不是 `/v1/chat/completions`
+
+## 打包与部署
+
+### 本地开发安装
+
+在项目根目录创建虚拟环境并安装：
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -e .
+```
+
+安装后可以直接使用包入口：
+
+```bash
+python -m zm_auto --help
+```
+
+### 命令行入口 `zm-auto`
+
+`pyproject.toml` 已配置 `console_scripts`，安装后可直接使用：
+
+```bash
+zm-auto --help
+zm-auto register -n 1
+zm-auto user-info --export-sub2api --yes
+```
+
+### 打包成 wheel / sdist
+
+```bash
+pip install build
+python -m build
+```
+
+会在 `dist/` 下生成：
+
+```text
+dist/zm_auto-0.1.0-py3-none-any.whl
+dist/zm_auto-0.1.0.tar.gz
+```
+
+安装 wheel：
+
+```bash
+pip install dist/zm_auto-0.1.0-py3-none-any.whl
+```
+
+### Docker 部署
+
+示例 `Dockerfile`：
+
+```dockerfile
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY pyproject.toml ./
+COPY zm_auto/ ./zm_auto/
+
+RUN pip install --no-cache-dir .
+
+ENTRYPOINT ["zm-auto"]
+```
+
+构建并运行：
+
+```bash
+docker build -t zm-auto .
+docker run --rm -it -v $(pwd)/config.json:/app/config.json zm-auto register -n 1
+```
+
+> 注意：浏览器/CDP 方案需要额外处理 Chrome/Chromium 环境，Docker 中通常更适合使用 2captcha 方案。
+
+### systemd 定时任务
+
+如果需要定时运行注册，可创建 `/etc/systemd/system/zm-auto-register.service`：
+
+```ini
+[Unit]
+Description=zm-auto register
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/zm-auto
+ExecStart=/opt/zm-auto/.venv/bin/python -m zm_auto register -n 1 --yes
+User=zmauto
+```
+
+和 `/etc/systemd/system/zm-auto-register.timer`：
+
+```ini
+[Unit]
+Description=Run zm-auto register every hour
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+启用：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now zm-auto-register.timer
+```
+
 
 ## 成本
 
@@ -275,6 +412,19 @@ curl https://your-target-site/api/v1/chat/completions \
 | Gemini | `GEMINI.md` |
 | GitHub Copilot | `.github/copilot-instructions.md` |
 
+## 兼容入口说明
+
+根目录保留了三个薄兼容脚本，其行为与 `python -m zm_auto <子命令>` 完全一致：
+
+| 兼容脚本 | 等价命令 | 说明 |
+|---|---|---|
+| `python register.py <args>` | `python -m zm_auto register <args>` | 注册账号，参数完整透传 |
+| `python read_user_info.py <args>` | `python -m zm_auto user-info <args>` | 读取用户信息，参数完整透传 |
+| `python check_account_status.py <args>` | `python -m zm_auto account-status <args>` | 账号状态诊断，参数完整透传 |
+
+这些脚本仅做命令转发，不会执行旧的独立逻辑；所有 CLI 参数（如 `-n`、`-t`、`--proxy`、`--cdp-url` 等）都会透传给对应的 click 子命令。
+
+
 ## SpecCoding / OpenSpec 工作流
 
 本项目使用 OpenSpec/SpecCoding 管理需求、跨模块改动和 AI 协作开发过程。
@@ -300,10 +450,14 @@ curl https://your-target-site/api/v1/chat/completions \
 
 ```bash
 # 语法检查
-python -m py_compile *.py
+python -m compileall zm_auto/
 # 单元测试
 python -m pytest tests/ -v
 # CLI 帮助
+python -m zm_auto --help
+python -m zm_auto register --help
+python -m zm_auto user-info --help
+# 兼容入口（仍可用）
 python register.py --help
 python read_user_info.py --help
 # OpenSpec 校验
@@ -311,3 +465,19 @@ openspec validate --all
 ```
 
 验证以语法检查、CLI 帮助、单元测试（`python -m pytest tests/ -v`）和真实 smoke 运行为主。
+
+## Agent Skills Schema
+
+导出 AI Agent 可用的 CLI 技能签名：
+
+```bash
+python -m zm_auto skills --format json
+python -m zm_auto skills --format compact
+```
+
+输出包含每个子命令的 JSON Schema，便于 Agent 自动调用。
+
+## Site Adapter
+
+站点相关逻辑已抽象到 `zm_auto/sites/`。新增站点时继承 `BaseSiteAdapter`，
+系统会自动发现并选择匹配的 adapter。

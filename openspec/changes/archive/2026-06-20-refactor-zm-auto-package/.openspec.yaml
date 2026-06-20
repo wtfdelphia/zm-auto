@@ -1,0 +1,7 @@
+schema: spec-driven
+id: refactor-zm-auto-package
+title: 重构 zm-auto 为 zm_auto Python 包
+status: in-progress
+author: agent
+created: 2026-06-19
+updated: 2026-06-20

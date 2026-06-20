@@ -1,0 +1,6 @@
+- Validating...
+✓ spec/account-registration
+✓ spec/captcha-provider
+✓ spec/mail-provider
+✓ change/refactor-zm-auto-package
+Totals: 4 passed, 0 failed (4 items)

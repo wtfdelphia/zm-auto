@@ -1,0 +1,71 @@
+{
+  "project": "zm-auto",
+  "version": "0.1.0",
+  "config_file": "/Users/delphia/Documents/data/workspace/github/zm-auto/config.json",
+  "config": {
+    "loaded": true,
+    "site_url": "https://zenmux.ai",
+    "proxy": "http://127.0.0.1:7890",
+    "captcha_provider": "cdp",
+    "cdp_url": "http://127.0.0.1:9222",
+    "auto_create_api_key": true
+  },
+  "mail_providers": [
+    {
+      "type": "cloudflare_temp_email",
+      "required_fields": []
+    },
+    {
+      "type": "duckmail",
+      "required_fields": []
+    },
+    {
+      "type": "gptmail",
+      "required_fields": []
+    },
+    {
+      "type": "inbucket",
+      "required_fields": []
+    },
+    {
+      "type": "moemail",
+      "required_fields": []
+    },
+    {
+      "type": "tempmail_lol",
+      "required_fields": []
+    },
+    {
+      "type": "yyds_mail",
+      "required_fields": []
+    }
+  ],
+  "captcha_providers": [
+    {
+      "name": "2captcha",
+      "layer": "paid_api",
+      "requires_api_key": true
+    },
+    {
+      "name": "anticaptcha",
+      "layer": "paid_api",
+      "requires_api_key": true
+    },
+    {
+      "name": "browser",
+      "layer": "execution",
+      "requires_api_key": false
+    },
+    {
+      "name": "cdp",
+      "layer": "human",
+      "requires_api_key": false
+    }
+  ],
+  "cdp_reachable": false,
+  "output_files": {
+    "accounts": "/Users/delphia/Documents/data/workspace/github/zm-auto/accounts.json",
+    "user_info": "/Users/delphia/Documents/data/workspace/github/zm-auto/user_info.json",
+    "sub2api_export": "/Users/delphia/Documents/data/workspace/github/zm-auto/sub2api_export.json"
+  }
+}

@@ -5,22 +5,21 @@ Users are solely responsible for complying with all applicable ToS and laws.
 
 from __future__ import annotations
 
-import json
+from typing import Any
+
 import requests
 import urllib3
-from pathlib import Path
-from typing import Any
+
+from zm_auto.config import load_config
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def _load_site_url() -> str:
     try:
-        with open(Path(__file__).resolve().parent / "config.json", encoding="utf-8") as f:
-            cfg = json.load(f)
-        return str(cfg.get("site_url", "https://zenmux.ai")).rstrip("/")
+        return str(load_config().site_url).rstrip("/")
     except Exception:
-        return "https://zenmux.ai"
+        return "https://example.com"
 
 
 class Sub2APIImporter:

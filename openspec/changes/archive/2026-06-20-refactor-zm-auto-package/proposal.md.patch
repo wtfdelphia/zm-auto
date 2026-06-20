@@ -1,0 +1,71 @@
+--- /Users/delphia/Documents/data/workspace/github/zm-auto/openspec/changes/refactor-zm-auto-package/proposal.md	2026-06-20 13:23:31
++++ /Users/delphia/Documents/data/workspace/github/zm-auto/openspec/changes/refactor-zm-auto-package/proposal.md.new	2026-06-20 13:47:24
+@@ -6,11 +6,15 @@
+ 
+ - 将 7 个扁平脚本迁移为 `zm_auto/` Python 包，按 providers/captcha/cdp/services/cli/importers 分层
+ - 引入 Pydantic v2 统一配置 Schema，替换分散的 dict 取值和三个 `load_config` 副本
+-- 抽取 CDP 公共工具到 `zm_auto/cdp/helpers.py`（`_cdp_connect` 和 `_cdp_new_page` 在 read_user_info.py 与 cdp_solver.py 中重复定义，`_extract_cookies` 一并移入统一管理）
++- 抽取 CDP 公共工具到 `zm_auto/cdp/helpers.py`，并进一步封装为 `zm_auto/cdp/session.py` 中的 `CDPSession` 上下文管理类（借鉴 bb-browser `CdpConnection`），统一生命周期管理、错误处理与资源清理
+ - 抽取 HTTP 会话工厂到 `zm_auto/http.py`，统一 curl_cffi Session 构建、代理、UA
+ - 用 `logging` 替换所有 `print(DEBUG...)` 裸输出
+ - 用 `click` 替换 `argparse`，提供 `python -m zm_auto <subcommand>` 统一 CLI 入口
++- 引入标准错误信封 `ZMError`（`zm_auto/exceptions.py`），CLI 输出 `message` + `hint`（借鉴 bb-browser protocol）
++- 对付费验证码 / API Key 创建 / CDP 人工模式等敏感操作增加 `--yes` 确认门控（借鉴 browser-act Confirmation Gate）
++- 新增 `doctor` 子命令，输出环境、配置、可用 provider 与 CDP 状态（借鉴 browser-act `get-skills`）
+ - 将 mail_provider.py 拆分为 8 个文件（base + 7 个 provider），每个 provider 一个文件
++- Provider 注册改用 `__subclasses__` 自动发现（替代原计划 `@meta` 文档块扫描），降低运行时复杂度
+ - 将 captcha_solver.py 按 provider 拆分为 4 个子模块（2captcha 与 anticaptcha 合并为 `paid_api.py`，共享 submit/poll 模式，共 3 个 solver 文件 + 1 个 base）
+ - 将 `Registrar.register()` 从 257 行拆分为可测试的步骤方法
+ - 统一 JSON 读写工具到 `zm_auto/utils.py`
+@@ -25,7 +29,7 @@
+ 
+ - `package-structure`: zm_auto Python 包，按 providers/captcha/cdp/services/cli/importers 分层，每层职责单一
+ - `config-management`: Pydantic v2 Config 模型，统一加载、校验、默认值，三个 `load_config` 副本合并为一个
+-- `cli-interface`: click 子命令组（`register`、`user-info`、`account-status`），统一 `--verbose` 日志控制
++- `cli-interface`: click 子命令组（`register`、`user-info`、`account-status`、`doctor`），统一 `--verbose` 日志控制、错误 hint、敏感操作确认门控
+ - `code-quality`: pytest 测试体系、ruff 代码检查、mypy 类型检查、logging 结构化日志
+ 
+ ### Modified Capabilities
+@@ -42,16 +46,19 @@
+ 
+ 本次重构参考了三个本地浏览器自动化项目的源码设计，但只借鉴架构思想，不引入外部依赖：
+ 
+-### bb-browser（借鉴：命令统一注册表 + CDP 封装 + Provider 元数据扫描）
++### bb-browser（借鉴：命令统一注册表 + CDP 封装 + Provider 元数据 + 错误信封）
+ 
+ - `packages/shared/src/commands.ts` 把所有命令集中注册为元数据数组，CLI 解析、daemon 分发、Hub 注册都从这里读取。本次重构在 `zm_auto/cli/commands.py` 中引入类似的命令注册表，集中声明子命令的元数据，避免 click 装饰器分散在各模块。
+-- `packages/daemon/src/cdp-connection.ts` 把 WebSocket 连接、target 发现、stealth 脚本注入封装成 `CdpConnection` 类。本次重构把 CDP 公共函数封装成 `CDPConnection`（或 `CDPSession`）类，而不是平铺的 helper 函数。
+-- `packages/daemon/src/site-adapter.ts` 通过扫描目录和解析文件头 `@meta` JSON 块自动注册 adapter。本次重构让每个 mail provider 文件携带 `@meta` 注解，`providers/__init__.py` 自动扫描注册，新增 provider 时无需修改工厂函数。
++- `packages/daemon/src/cdp-connection.ts` 把 WebSocket 连接、target 发现、stealth 脚本注入封装成 `CdpConnection` 类。本次重构把 CDP 公共函数封装成 `CDPSession` 类（`zm_auto/cdp/session.py`），而不是平铺的 helper 函数，避免资源泄漏。
++- `packages/daemon/src/site-adapter.ts` 通过扫描目录和解析文件头 `@meta` JSON 块自动注册 adapter。zm-auto 的 provider 注册受其启发，但采用更 Pythonic 的 `__subclasses__` 自动发现：每个 provider 继承 `BaseMailProvider`，基类 `__init_subclass__` 自动注册，无需扫描 docstring。
++- `packages/shared/src/protocol.ts` 使用标准错误信封 `{error: {message, hint}}`。本次重构在 `zm_auto/exceptions.py` 中定义 `ZMError`，CLI 捕获后输出 `message` + `hint`，提升 Agent 和用户的可理解性。
+ 
+-### browser-act/skills（借鉴：验证码三层防御 + Provider/Skill 规范文档）
++### browser-act/skills（借鉴：验证码三层防御 + Provider/Skill 规范文档 + 确认门控 + 自描述命令）
+ 
+ - browser-act 把自动化防御分为环境层（指纹/代理/TLS）、执行层（自动解验证码）、人类层（remote-assist）。本次重构把验证码 solver 抽象为三层：`paid_api`（环境层，纯 HTTP 打码）、`browser`（执行层，本地 Playwright 自动解）、`cdp`（人类层，CDP 人工介入）。
+ - browser-act 的每个 Skill 是独立的 `SKILL.md` + 脚本。本次重构为每个 mail provider 和 captcha solver 提供 `README.md`/`SPEC.md`，统一说明前置条件、输入输出、失败策略。
++- browser-act 对创建浏览器、导入 Profile、代理变更等敏感操作要求显式确认。本次重构对付费验证码调用、API Key 创建、CDP 人工模式提供 `--yes` 参数，默认交互式确认。
++- browser-act 通过 `get-skills` 让 Agent 先获取环境状态。本次重构新增 `doctor` 子命令，输出配置、可用 provider、CDP 可达性等状态。
+ 
+ ### Obscura（不引入，作为长期技术雷达）
+ 
+@@ -64,5 +71,18 @@
+ - 108 个现有测试的 import 路径需更新
+ - `config.example.json` 与 `DEFAULT_CONFIG` 双向收敛：DEFAULT_CONFIG 补全 `captcha.browser.user_data_dir`、`sub2api.export.*`、`auto_create_api_key` 字段，`wait_interval` 统一为 `2`，`site_url` 统一为 `"https://example.com"`，`sub2api.upstream_base_url` 统一为空字符串 `""`（依赖 fallback 逻辑拼接）；`config.example.json` 移除顶层 `headless` 和 `_comment_captcha`
+ - `mail.user_agent`：DEFAULT_CONFIG 改为字面量字符串，常量 `USER_AGENT` 移入 `zm_auto/constants.py`
++- 新增 `zm_auto/cdp/session.py`（`CDPSession` 类）与 `zm_auto/exceptions.py`（`ZMError`）
++- CLI 增加 `--yes`/`-y` 确认参数与 `doctor` 子命令
++- Provider 注册从 `@meta` 文档块扫描改为 `__subclasses__` 自动发现
+ - 新增依赖：`pydantic>=2`、`click`；开发依赖：`pytest`、`ruff`、`mypy`
+ - 根目录保留 `register.py`、`read_user_info.py`、`check_account_status.py` 作为薄兼容入口
++
++## Out of Scope
++
++以下方向已评估，但不在本次 change 范围内，后续可单独建立变更跟进：
++
++- 验证码 fallback 链（paid_api → browser → cdp）
++- 测试进程隔离 / 子进程运行集成测试
++- 真实站点 obstacle course 回归套件
++- Docker / devcontainer 开发环境
++- 独立 provider `SKILL.md` 规范包

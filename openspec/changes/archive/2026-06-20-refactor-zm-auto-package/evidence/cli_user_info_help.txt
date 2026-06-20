@@ -1,0 +1,15 @@
+Usage: python -m zm_auto user-info [OPTIONS]
+
+  读取已登录账号信息，支持导出 sub2api。
+
+Options:
+  --cdp-url TEXT                CDP 连接地址  [default: ""]
+  -o, --output TEXT             输出 JSON 文件路径  [default: ""]
+  --export-sub2api              导出 sub2api 兼容格式
+  --export-sub2api-output TEXT  sub2api 导出文件路径  [default: ""]
+  --pretty                      美化打印
+  --api-keys-only               只读取 API Keys
+  --user-only                   只读取用户信息
+  --create-key TEXT             若不存在 API Key 则自动创建
+  --yes                         跳过敏感操作确认
+  --help                        Show this message and exit.

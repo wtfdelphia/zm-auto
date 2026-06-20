@@ -5,7 +5,7 @@
 - 项目名: zm-auto
 - 定位: 全自动账号注册 + API Key 获取的 Python 工具集
 - 技术栈: Python 3.x
-- 主入口: `register.py`, `read_user_info.py`
+- 主入口: `python -m zm_auto register`, `python -m zm_auto user-info`（保留 `register.py`、`read_user_info.py` 薄兼容入口）
 - 通用规则: `AGENTS.md`
 - 设计事实: `spec/design.md`
 
@@ -60,8 +60,14 @@
 
 ## Verification Baseline
 
-- `python -m py_compile register.py read_user_info.py mail_provider.py captcha_solver.py cdp_solver.py check_account_status.py sub2api_importer.py`
+- `python -m compileall zm_auto/`
 - `python -m pytest tests/ -v`
-- `python register.py --help`
-- `python read_user_info.py --help`
+- `python -m zm_auto --help`
+- `python -m zm_auto register --help`
+- `python -m zm_auto user-info --help`
+- `python -m zm_auto doctor --help`
+- `python register.py --help`（兼容入口）
+- `python read_user_info.py --help`（兼容入口）
+- `ruff check zm_auto/`
+- `mypy zm_auto/`
 - `openspec validate --all`

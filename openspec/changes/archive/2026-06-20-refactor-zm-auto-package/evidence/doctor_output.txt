@@ -1,0 +1,24 @@
+zm-auto doctor
+============================================================
+project: zm-auto
+version: 0.1.0
+config file: /Users/delphia/Documents/data/workspace/github/zm-auto/config.json
+config loaded: ok
+  site_url: https://zenmux.ai
+  proxy: http://127.0.0.1:7890
+  captcha_provider: cdp
+  auto_create_api_key: True
+mail providers:
+  - cloudflare_temp_email (required: 无)
+  - duckmail (required: 无)
+  - gptmail (required: 无)
+  - inbucket (required: 无)
+  - moemail (required: 无)
+  - tempmail_lol (required: 无)
+  - yyds_mail (required: 无)
+captcha providers:
+  - 2captcha [paid_api] requires_api_key=True
+  - anticaptcha [paid_api] requires_api_key=True
+  - browser [execution] requires_api_key=False
+  - cdp [human] requires_api_key=False
+cdp reachable: no (Chrome may not be running)

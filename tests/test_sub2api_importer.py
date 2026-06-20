@@ -1,7 +1,7 @@
 """Tests for sub2api_importer module."""
 
 import pytest
-from sub2api_importer import Sub2APIImporter
+from zm_auto.importers import Sub2APIImporter
 
 
 class TestSub2APIImporterInit:

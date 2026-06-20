@@ -68,9 +68,10 @@
 
 ## Verification
 
-- `python -m py_compile captcha_solver.py cdp_solver.py`
-- `python captcha_solver.py`（需正确配置 provider）
-- 切换 provider 后运行 `register.py -n 1`
+- `python -m compileall zm_auto/captcha`
+- `python -m py_compile zm_auto/captcha/*.py`
+- `python -m zm_auto register -n 1`（配置 captcha.provider 后运行）
+- 切换 provider 后运行 `python -m zm_auto register -n 1`
 
 ## Residual Risk
 

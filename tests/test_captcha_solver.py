@@ -1,12 +1,12 @@
 """Tests for captcha_solver.py (no network/browser calls)."""
 
-import os
 import time
 from unittest.mock import patch
 
 import pytest
 
-from captcha_solver import CaptchaSolver, TURNSTILE_SITE_KEY, RECAPTCHA_SITE_KEY
+from zm_auto.captcha import CaptchaSolver
+from zm_auto.constants import TURNSTILE_SITE_KEY, RECAPTCHA_SITE_KEY
 
 
 # --------------------------------------------------------------------------- #

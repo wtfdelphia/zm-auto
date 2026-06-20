@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zm-auto"
+version = "0.1.0"
+description = "全自动账号注册 + API Key 获取 Python 工具集"
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2",
+    "click",
+    "curl_cffi",
+    "requests",
+    "urllib3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "mypy",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["zm_auto*"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E402", "E501", "I001"]
+
+[tool.mypy]
+
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[project.scripts]
+zm-auto = "zm_auto.cli:main"

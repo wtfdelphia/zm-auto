@@ -2,11 +2,10 @@
 
 import re
 from datetime import datetime, timezone
-from unittest.mock import patch
 
 import pytest
 
-from mail_provider import (
+from zm_auto.providers import (
     _config,
     _random_mailbox_name,
     _random_subdomain_label,

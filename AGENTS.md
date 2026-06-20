@@ -21,7 +21,7 @@
   - `config.json` — 运行时配置（包含密钥，已 `.gitignore` 忽略）
   - `accounts.json` / `user_info.json` / `sub2api_export.json` — 运行输出（已忽略）
 - **入口命令**:
-  - `python register.py -n 1`
+  - `python -m zm_auto register -n 1`
   - `python read_user_info.py`
 
 ## AI 协作纪律（Karpathy 行为纪律）
@@ -68,7 +68,7 @@
 | --- | --- | --- |
 | 密钥 / 配置 | `config.json` 含 API Key、代理、邮箱 admin 密码 | 确认 `.gitignore` 已忽略 `config.json`；不提交真实密钥 |
 | 验证码 | 2captcha / anticaptcha / browser / cdp 切换 | `python captcha_solver.py` 不报错（如 provider 配置正确） |
-| 邮箱 provider | 临时邮箱 API 变化、域名失效 | 单个注册 `python register.py -n 1` 通过 |
+| 邮箱 provider | 临时邮箱 API 变化、域名失效 | 单个注册 `python -m zm_auto register -n 1` 通过 |
 | 目标站点 | `site_url`、邀请码、ctoken / sessionId 行为 | 抓取响应日志确认接口状态 |
 | 输出文件 | `accounts.json` / `user_info.json` 格式变化 | 对比示例输出 |
 | 第三方依赖 | `curl_cffi` / `playwright` 版本、系统 Chromium | `python -m py_compile *.py` |
@@ -84,12 +84,18 @@
 
 ```bash
 # 语法检查
-python -m py_compile register.py read_user_info.py mail_provider.py captcha_solver.py cdp_solver.py check_account_status.py sub2api_importer.py
+python -m compileall zm_auto/
 
 # 单元测试
 python -m pytest tests/ -v
 
 # 查看 CLI 帮助
+python -m zm_auto --help
+python -m zm_auto register --help
+python -m zm_auto user-info --help
+python -m zm_auto skills --format json
+
+# 兼容入口（仍可用）
 python register.py --help
 python read_user_info.py --help
 ```

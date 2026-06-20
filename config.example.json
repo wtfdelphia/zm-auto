@@ -71,7 +71,6 @@
   "proxy": "",
   "total": 1,
   "threads": 1,
-  "headless": false,
   "captcha": {
     "provider": "2captcha",
     "api_key": "",
@@ -83,7 +82,6 @@
     }
   },
   "api_key_name": "auto",
-  "_comment_captcha": "验证码方案: 修改 captcha.provider 即可切换\n  \"2captcha\" = 打码平台（需 api_key，纯 HTTP，~$0.005/账号）\n  \"browser\"  = 本地 Playwright 浏览器（免费，自动完成）\n  \"cdp\"      = Chrome DevTools 人工介入（免费，最稳，需先启动 Chrome）\nCDP 方案启动 Chrome 命令:\n  open -a \"Google Chrome\" --args --remote-debugging-port=9222 --proxy-server=\"http://127.0.0.1:7890\" --user-data-dir=/tmp/chrome-cdp",
   "sub2api": {
     "enabled": false,
     "base_url": "",

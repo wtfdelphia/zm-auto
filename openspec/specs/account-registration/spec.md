@@ -6,9 +6,24 @@
 
 ## Requirements
 
+### Requirement: 根目录兼容入口透传 CLI 参数
+
+根目录的 `register.py` 薄兼容入口 SHALL 将命令行参数透传给 `python -m zm_auto register`，使得 `python register.py <args>` 与 `python -m zm_auto register <args>` 行为一致。
+
+#### Scenario: 通过兼容入口指定注册数量
+
+- **WHEN** 用户执行 `python register.py -n 5`
+- **THEN** 系统等价于执行 `python -m zm_auto register -n 5`
+- **AND** 注册 5 个账号
+
+#### Scenario: 通过兼容入口查看帮助
+
+- **WHEN** 用户执行 `python register.py --help`
+- **THEN** 系统显示 `register` 子命令的帮助信息
+
 ### Requirement: 单个账号注册
 
-用户 SHALL 通过 CLI 命令 `python register.py -n 1` 完成单个账号的全自动注册流程。
+用户 SHALL 通过 CLI 命令 `python -m zm_auto register -n 1` 完成单个账号的全自动注册流程。根目录保留 `register.py` 薄兼容入口，执行 `python register.py -n 1` 时委托给 `python -m zm_auto register -n 1`。
 
 #### Scenario: 使用 2captcha 方案完成单个注册
 
@@ -34,7 +49,7 @@
 
 #### Scenario: 5 个账号 2 并发
 
-- **WHEN** 用户执行 `python register.py -n 5 -t 2`
+- **WHEN** 用户执行 `python -m zm_auto register -n 5 -t 2`
 - **THEN** 系统以 2 个并发线程注册 5 个账号
 - **AND** 每个账号独立完成邮箱创建、验证码、登录、API Key 创建
 
@@ -55,7 +70,7 @@
 
 #### Scenario: 使用代理注册
 
-- **WHEN** 用户执行 `python register.py -n 1 --proxy http://127.0.0.1:7897`
+- **WHEN** 用户执行 `python -m zm_auto register -n 1 --proxy http://127.0.0.1:7897`
 - **THEN** 所有 HTTP 请求和浏览器流量均通过指定代理
 
 ## Non-Goals
@@ -65,9 +80,12 @@
 
 ## Verification
 
-- `python -m py_compile register.py mail_provider.py captcha_solver.py cdp_solver.py`
-- `python register.py --help`
-- `python register.py -n 1`（需正确配置 `config.json`）
+- `python -m compileall zm_auto/`
+- `python -m pytest tests/ -v`
+- `python -m zm_auto --help`
+- `python -m zm_auto register --help`
+- `python -m zm_auto doctor --help`
+- `python -m zm_auto register -n 1`（需正确配置 `config.json`）
 
 ## Residual Risk
 

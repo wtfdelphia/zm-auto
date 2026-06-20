@@ -227,7 +227,7 @@ dev = [
 - [ ] `pytest` 全部通过。
 - [ ] `ruff check .` 无错误。
 - [ ] `mypy zm_auto` 无关键类型错误。
-- [ ] 旧 CLI `python register.py` 仍可通过兼容入口运行（或已迁移到新 CLI）。
+- [x] 旧 CLI 兼容入口 `python register.py`、`python read_user_info.py`、`python check_account_status.py` 透传命令行参数，与 `python -m zm_auto <subcommand>` 行为一致。
 - [ ] 无裸 `print(DEBUG...)` 调试语句。
 - [ ] 核心文件行数均 <400 行。
 

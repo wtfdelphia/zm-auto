@@ -1,0 +1,7 @@
+CDP 冒烟验证：使用 Playwright Chromium 启动 --remote-debugging-port=9222，
+通过 zm_auto.cdp.session.CDPSession 连接、导航到 https://example.com、提取页面信息。
+
+title=Example Domain
+url=https://example.com/
+cookies_count=0
+CDP smoke test passed

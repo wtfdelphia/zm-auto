@@ -1,0 +1,13 @@
+Usage: python -m zm_auto [OPTIONS] COMMAND [ARGS]...
+
+  zm-auto 命令行入口。
+
+Options:
+  --verbose  启用 DEBUG 级别日志
+  --help     Show this message and exit.
+
+Commands:
+  account-status  诊断 zenmux 账号当前状态。
+  doctor          输出环境、配置、provider 与 CDP 状态。
+  register        自动注册账号并获取 API Key。
+  user-info       读取已登录账号信息，支持导出 sub2api。

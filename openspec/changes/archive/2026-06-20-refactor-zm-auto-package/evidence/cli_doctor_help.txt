@@ -1,0 +1,7 @@
+Usage: python -m zm_auto doctor [OPTIONS]
+
+  输出环境、配置、provider 与 CDP 状态。
+
+Options:
+  --format TEXT  输出格式 (text|json)  [default: text]
+  --help         Show this message and exit.
