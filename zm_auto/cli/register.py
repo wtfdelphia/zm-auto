@@ -7,7 +7,7 @@ from zm_auto.config import load_config
 
 
 
-def main(total: int | None = None, threads: int | None = None, proxy: str = "", yes: bool = False) -> None:
+def main(total: int | None = None, threads: int | None = None, proxy: str = "", yes: bool = False, export_sub2api: bool = False, export_sub2api_output: str = "") -> None:
     cfg = load_config().model_dump()
     # Sensitive operations confirmation
     if not yes:
@@ -23,4 +23,4 @@ def main(total: int | None = None, threads: int | None = None, proxy: str = "", 
         reg_config["threads"] = threads
     if proxy:
         reg_config["proxy"] = proxy
-    run(total=reg_config["total"], threads=reg_config["threads"])
+    run(total=reg_config["total"], threads=reg_config["threads"], export_sub2api=export_sub2api, export_sub2api_output=export_sub2api_output)

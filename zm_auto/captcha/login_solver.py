@@ -186,9 +186,9 @@ class CDPLoginSolver:
         code_thread = threading.Thread(target=_poll_email, daemon=True)
         code_thread.start()
 
-        # Wait for code input field to appear (max 30s, then continue anyway)
+        # Wait for code input field to appear (max 5s, then continue anyway)
         logger.info(" 等待验证码输入框出现...")
-        field_deadline = time.time() + 30
+        field_deadline = time.time() + 5
         input_ready = False
         while time.time() < field_deadline:
             for sel in [
@@ -209,7 +209,7 @@ class CDPLoginSolver:
                 break
             time.sleep(1)
         if not input_ready:
-            logger.info("  ⚠ 输入框未在30s内出现，继续等待验证码...")
+            logger.info("  ⚠ 输入框未在5s内出现，继续等待验证码...")
 
         # Wait for email code (with remaining deadline)
         logger.info(" 等待邮箱验证码...")
@@ -233,23 +233,25 @@ class CDPLoginSolver:
         ])
         time.sleep(0.5)
 
-        logger.info(" 点击验证...")
-        self._click_button(page, [
-            'button:has-text("验证")',
-            'button:has-text("Verify")',
-            'button:has-text("登录")',
-            'button:has-text("Login")',
-            'button:has-text("确认")',
-            'button:has-text("Submit")',
-            '[type="submit"]',
-        ])
-
-        # ---- 7. Wait for login redirect ----
-        logger.info(" 等待登录完成...")
+        # ---- 7. Click verify (fallback) and wait for redirect ----
+        # 某些站点输入验证码后会自动跳转 /verify?method=unknown 进行额外人机验证，
+        # 不需要点击按钮；先尝试点击按钮，失败则等待自动跳转。
+        logger.info(" 等待页面跳转...")
         try:
-            page.wait_for_url("**/platform/**", timeout=15000)
+            self._click_button(page, [
+                'button:has-text("验证")',
+                'button:has-text("Verify")',
+                'button:has-text("登录")',
+                'button:has-text("Login")',
+                'button:has-text("确认")',
+                'button:has-text("Submit")',
+                '[type="submit"]',
+            ])
         except Exception:
-            time.sleep(2)
+            logger.info("  未找到验证按钮，等待页面自动跳转...")
+
+        # Wait for login redirect (/platform success or /verify additional check)
+        self._wait_for_login_or_verify(page)
         current_url = page.url
         logger.info(f" 当前页面: {current_url}")
         if "waitlist" in current_url:
@@ -290,16 +292,49 @@ class CDPLoginSolver:
         return {"cookies": cookies, "csrf_token": csrf_token}
 
     def logout(self) -> None:
-        """Log out from zenmux in the browser, clearing the session."""
+        """Log out from zenmux by calling the server logout API."""
         if self._session is None:
             return
         try:
-            page = self._session.new_page()
-            # Navigate to logout
-            page.goto(f"{self.site_url}/logout", wait_until="domcontentloaded", timeout=10000)
-            time.sleep(1)
+            page = self._session.page
+            # Extract ctoken from browser cookies
+            cookies = page.context.cookies()
+            ctoken = ""
+            for c in cookies:
+                if c.get("name") == "ctoken":
+                    ctoken = str(c.get("value") or "")
+                    break
+
+            if ctoken:
+                import urllib.parse as _up
+                logout_url = f"{self.site_url}/api/user/logout?ctoken={_up.quote(ctoken)}"
+                try:
+                    result = page.evaluate(
+                        f"""
+                        async () => {{
+                            try {{
+                                const resp = await fetch("{logout_url}", {{
+                                    method: "POST",
+                                    credentials: "include",
+                                }});
+                                return {{ ok: resp.ok, status: resp.status }};
+                            }} catch (e) {{
+                                return {{ ok: false, error: e.message }};
+                            }}
+                        }}
+                        """
+                    )
+                    logger.info(f"  服务端退出登录: {result}")
+                except Exception as e:
+                    logger.info(f"  服务端退出登录失败: {e}")
+
+            # Fallback: navigate to logout page and clear cookies
+            try:
+                page.goto(f"{self.site_url}/logout", wait_until="domcontentloaded", timeout=10000)
+                time.sleep(1)
+            except Exception:
+                pass
             logger.info("  浏览器已退出登录")
-            page.close()
         except Exception as e:
             logger.info(f"  退出登录失败: {e}")
             # Fallback: clear cookies for zenmux domain
@@ -313,6 +348,70 @@ class CDPLoginSolver:
                 pass
 
     # -- helpers --
+
+    @staticmethod
+    def _wait_for_login_or_verify(page: Any, timeout: int = 60, verify_wait: int = 15) -> None:
+        """等待页面跳转到 /platform、/ 或 /verify?method=unknown 完成后再继续。
+
+        部分站点在输入验证码后会先跳转到 /verify?method=unknown 进行额外人机验证。
+        由于验证完成后不一定触发可被 Playwright 感知的 URL 跳转，因此在额外验证页
+        等待 verify_wait 秒后，会通过浏览器内调用 /api/user/info 来判断是否已登录。
+        仅当 /api/user/info 返回有效的 userId/accountId 且 needVerify 为 false 时，
+        才视为登录成功并继续后续流程。
+        """
+        import urllib.parse as _up
+        deadline = time.time() + timeout
+        verify_seen_at: float | None = None
+        while time.time() < deadline:
+            current_url = page.url
+            parsed = _up.urlparse(current_url)
+            path = parsed.path or ""
+            # 登录成功可能跳转到 /platform 或站点根路径 /
+            if "/platform" in path or path in ("/", ""):
+                return
+            if "/verify" in path:
+                if verify_seen_at is None:
+                    verify_seen_at = time.time()
+                    logger.info(f"  进入额外验证页: {current_url}，等待验证完成...")
+                elapsed = time.time() - verify_seen_at
+                if elapsed >= verify_wait:
+                    # 通过浏览器内调用 /api/user/info 确认是否已登录
+                    try:
+                        result = page.evaluate(
+                            """
+                            async () => {
+                                try {
+                                    const resp = await fetch('/api/user/info', {
+                                        credentials: 'include',
+                                        headers: { 'x-api-version': '2026-04-20' }
+                                    });
+                                    const text = await resp.text();
+                                    try { return { status: resp.status, body: JSON.parse(text) }; }
+                                    catch (e) { return { status: resp.status, raw: text.slice(0, 500) }; }
+                                } catch (e) {
+                                    return { error: e.message };
+                                }
+                            }
+                            """
+                        )
+                        body = (result or {}).get('body') or {}
+                        data = body.get('data') or {}
+                        user_id = data.get('userId') or data.get('accountId')
+                        need_verify = data.get('needVerify')
+                        if user_id and (need_verify is False or need_verify is None):
+                            logger.info(f"  浏览器内 /api/user/info 返回有效用户 (userId={user_id}) 且 needVerify={need_verify}，验证完成")
+                            return
+                        if user_id and need_verify is True:
+                            logger.info(f"  浏览器内 /api/user/info 返回 needVerify=true，继续等待验证完成...")
+                    except Exception as e:
+                        logger.info(f"  浏览器内 /api/user/info 检查失败: {e}")
+                time.sleep(2)
+                continue
+            # 离开 /verify 但还不是成功页，重置计时器继续等待
+            verify_seen_at = None
+            time.sleep(1)
+        raise RuntimeError(f"等待登录跳转超时 ({timeout}s)，当前页面: {page.url}")
+
     @staticmethod
     def _fill_input(page: Any, text: str, selectors: list[str]) -> None:
         # Strategy 1: try explicit selectors

@@ -169,11 +169,11 @@ def create_api_key(page: Any, session: curl_requests.Session, name: str = "") ->
 
     csrf_token = _extract_csrf_token(page)
     ctoken = _extract_ctoken(page)
-    payload = {"name": name, "tags": []}
+    payload = {"name": name, "tags": ["free"]}
 
     # 1) 页面内 fetch 创建（cookie 自动携带，最稳）
     adapter = get_site_adapter()
-    resp = _post_via_page(page, adapter.register_endpoints().get("create_key", "/api/api_key/create"), payload, csrf_token)
+    resp = _post_via_page(page, adapter.register_endpoints().get("create_key", "/api/api_key/create"), payload, csrf_token, ctoken)
     if not resp.get("ok") and resp.get("status") not in (200, 201):
         logger.info(f"{_ts()} 页面 fetch 创建失败: {resp.get('error')}")
         resp = _post_via_http(session, adapter.register_endpoints().get("create_key", "/api/api_key/create"), payload, csrf_token, ctoken)
@@ -196,7 +196,7 @@ def create_api_key(page: Any, session: curl_requests.Session, name: str = "") ->
 
     # 2) 如果返回的是脱敏 key，尝试从 list 拿最新的
     if not token or "*" in token or "..." in token or len(token) < 20:
-        logger.info(f"{_ts()} 创建响应未返回完整 key，尝试从列表获取...")
+        logger.info(f"{_ts()} 创建响应未返回完整 key，尝试从列表获取... (响应字段: {list(raw.keys()) if isinstance(raw, dict) else type(raw).__name__})")
         latest = _read_api_keys(page, session)
         if latest:
             first = latest[0]

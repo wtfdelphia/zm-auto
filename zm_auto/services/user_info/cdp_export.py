@@ -49,7 +49,7 @@ def _fetch_via_page(page: Any, path: str) -> Any:
             }}
         }}
         """
-    )
+)
 
 
 def _make_http_session(cookies: dict[str, str], proxy: str = "") -> curl_requests.Session:
@@ -126,7 +126,7 @@ def _extract_ctoken(page: Any) -> Any:
     return ""
 
 
-def _post_via_page(page: Any, path: str, payload: dict, csrf_token: str = "") -> Any:
+def _post_via_page(page: Any, path: str, payload: dict, csrf_token: str = "", ctoken: str = "") -> Any:
     """通过页面内 fetch 发起 POST（自动携带 cookies）。"""
     import json as _json
     headers = {
@@ -139,11 +139,18 @@ def _post_via_page(page: Any, path: str, payload: dict, csrf_token: str = "") ->
         headers["x-xsrf-token"] = csrf_token
     headers_json = _json.dumps(headers)
     payload_json = _json.dumps(payload)
+    # 与 HTTP 版本保持一致，把 ctoken 附加到 URL 查询参数
+    import urllib.parse as _up
+    if ctoken:
+        sep = "&" if "?" in path else "?"
+        url = f"{path}{sep}ctoken={_up.quote(ctoken)}"
+    else:
+        url = path
     return page.evaluate(
         f"""
         async () => {{
             try {{
-                const resp = await fetch("{path}", {{
+                const resp = await fetch("{url}", {{
                     method: "POST",
                     headers: {headers_json},
                     body: JSON.stringify({payload_json}),

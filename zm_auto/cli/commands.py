@@ -87,6 +87,8 @@ COMMANDS: list[CommandDef] = [
             ParamDef("threads", "number", None, "并发数", flag="-t"),
             ParamDef("proxy", "string", "", "代理地址"),
             ParamDef("yes", "boolean", False, "跳过敏感操作确认", is_flag=True, flag="--yes"),
+            ParamDef("export_sub2api", "boolean", False, "导出 sub2api 兼容格式", is_flag=True, flag="--export-sub2api"),
+            ParamDef("export_sub2api_output", "string", "", "sub2api 导出文件路径", flag="--export-sub2api-output"),
         ],
     ),
     CommandDef(

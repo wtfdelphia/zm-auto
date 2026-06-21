@@ -182,6 +182,12 @@ python -m zm_auto register -n 5 -t 2
 # 走代理（浏览器方案也会自动透传代理）
 python -m zm_auto register -n 3 --proxy http://127.0.0.1:7897
 
+# 注册并导出 sub2api 兼容格式
+python -m zm_auto register -n 3 --export-sub2api
+
+# 指定 sub2api 导出文件路径
+python -m zm_auto register -n 3 --export-sub2api --export-sub2api-output /path/to/export.json
+
 # 兼容入口（仍可用）
 python register.py -n 1
 ```
@@ -194,6 +200,8 @@ python register.py -n 1
 [
   {
     "email": "tmpabc@example.com",
+    "email_provider": "duckmail",
+    "email_token": "eyJhbGciOiJIUzI1Ni...",
     "user_id": "2625US...",
     "api_key": "sk-ai-v1-xxxx...xxxx",
     "key_name": "abc123",
@@ -201,6 +209,9 @@ python register.py -n 1
   }
 ]
 ```
+
+- `email_provider`: 使用的临时邮箱 provider 类型（如 `duckmail`、`gptmail` 等）
+- `email_token`: 邮箱 provider 的访问 token（部分 provider 可能为空）
 
 ## 读取已登录账号（user-info）
 

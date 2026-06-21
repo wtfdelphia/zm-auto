@@ -40,20 +40,54 @@ class Registrar:
         self.mailbox: dict[str, Any] = {}
 
     def close(self) -> None:
+        """关闭验证码 solver 和 CDP 浏览器（在 worker 线程执行）。
+
+        HTTP session 不在这里关闭，以便主线程在文件写入后继续使用它调用服务端 logout。
+        """
         try:
             if self.solver:
                 self.solver.close()
         except Exception:
             pass
         try:
-            self.session.close()
+            if self._cdp_solver:
+                self._cdp_solver.close()
         except Exception:
             pass
+
+    def logout(self) -> None:
+        """调用服务端退出登录接口（应在文件写入后执行）。
+
+        为避免在 worker 线程外的线程调用 Playwright page 对象，这里通过本 Registrar
+        的 HTTP session 发起 POST，带上与登录相同的 session cookies。
+        """
+        if not config.get("logout_after", True):
+            return
+        if not self.ctoken:
+            return
         try:
-            if self._cdp_solver and config.get("logout_after", True):
-                self._cdp_solver.logout()
-        except Exception:
-            pass
+            import urllib.parse as _up
+            from zm_auto.constants import USER_AGENT
+            logout_url = f"{TARGET_BASE}/api/user/logout?ctoken={_up.quote(self.ctoken)}"
+            # 使用最小请求头，匹配浏览器内 fetch 行为；避免 application/json 引起服务端 500
+            headers = {
+                "User-Agent": USER_AGENT,
+                "Referer": f"{TARGET_BASE}/",
+                "Accept": "application/json, text/plain, */*",
+            }
+            resp = self.session.post(logout_url, headers=headers, timeout=10, verify=False)
+            if resp.status_code == 200:
+                logger.info(f"  服务端退出登录: HTTP {resp.status_code}")
+            else:
+                body = resp.text[:300]
+                logger.info(f"  服务端退出登录: HTTP {resp.status_code}, body={body}")
+        except Exception as e:
+            logger.info(f"  退出登录失败: {e}")
+        finally:
+            try:
+                self.session.close()
+            except Exception:
+                pass
 
     @property
     def captcha(self) -> CaptchaSolver:
@@ -203,16 +237,13 @@ class Registrar:
                     domain=c.get("domain", ""),
                     path=c.get("path", "/"),
                 )
+            # CDP 登录后 ctoken 可能已更新，刷新并作为 CSRF token 回退
+            self.ctoken = str(self.session.cookies.get("ctoken") or self.ctoken)
+            if not csrf_token:
+                csrf_token = self.ctoken
             # Store CSRF token for API requests
             self.csrf_token = csrf_token
             step(index, "CDP 登录完成", "green")
-
-            # Logout from browser to clean session for next registration
-            if config.get("logout_after", True):
-                try:
-                    login_solver.logout()
-                except Exception:
-                    pass
         else:
             # HTTP flow: 2captcha / browser provider
             step(index, "解 Turnstile", "cyan")
@@ -342,7 +373,17 @@ class Registrar:
                     # Some APIs return the full key only in create, list shows masked
                     api_key = str(create_data.get("token") or create_data.get("key") or "")
         if not api_key:
-            raise RuntimeError(f"创建 API Key 失败: {create_resp}")
+            step(index, f"创建 API Key 失败: {create_resp}", "red")
+            return {
+                "email": email,
+                "email_provider": str(self.mailbox.get("provider") or ""),
+                "email_token": str(self.mailbox.get("token") or ""),
+                "user_id": user_id,
+                "api_key": "",
+                "key_name": key_name,
+                "note": f"api_key_create_failed: {create_resp}",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
         step(index, f"API Key: {api_key[:12]}...{api_key[-4:]}", "green")
 
         # 11. Import to Sub2API
@@ -360,6 +401,8 @@ class Registrar:
 
         return {
             "email": email,
+            "email_provider": str(self.mailbox.get("provider") or ""),
+            "email_token": str(self.mailbox.get("token") or ""),
             "user_id": user_id,
             "api_key": api_key,
             "key_name": key_name,

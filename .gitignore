@@ -17,7 +17,7 @@ test.sh
 # Output
 
 accounts.json
-sub2api_export.json
+sub2api_export*.json
 user_info.json
 docs/auto.js
 

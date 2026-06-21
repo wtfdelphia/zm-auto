@@ -28,5 +28,5 @@ class ZenmuxAdapter(BaseSiteAdapter):
         return {
             "send_code": "/api/auth/email/send-code",
             "verify_code": "/api/auth/email/verify-code",
-            "create_key": "/api/api_key",
+            "create_key": "/api/api_key/create",
         }

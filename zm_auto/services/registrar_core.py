@@ -81,11 +81,18 @@ def worker(index: int) -> dict:
             stats["done"] += 1
             stats["success"] += 1
             avg = (time.time() - stats["start_time"]) / max(stats["success"], 1)
-        log(
-            f'{result["email"]} 注册成功，耗时{cost:.1f}s，平均{avg:.1f}s/个，'
-            f'API Key: {result["api_key"][:12]}...{result["api_key"][-4:]}',
-            "green",
-        )
+        if result.get("api_key"):
+            log(
+                f'{result["email"]} 注册成功，耗时{cost:.1f}s，平均{avg:.1f}s/个，'
+                f'API Key: {result["api_key"][:12]}...{result["api_key"][-4:]}',
+                "green",
+            )
+        else:
+            log(
+                f'{result["email"]} 部分成功（API Key 未创建），耗时{cost:.1f}s，'
+                f'原因: {result.get("note", "unknown")}',
+                "yellow",
+            )
         return {"ok": True, "index": index, "result": result}
     except Exception as e:
         cost = time.time() - start
